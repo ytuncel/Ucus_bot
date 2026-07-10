@@ -1,19 +1,19 @@
 import os
 import requests
+from flask import Flask, jsonify, render_template
+from flask_cors import CORS # Eğer yüklü değilse requirements.txt'ye flask-cors ekleyin
 from dotenv import load_dotenv
 
 load_dotenv()
 
-AIRLABS_KEY = os.getenv("AIRLABS_API_KEY")
-# İleride 2. veya 3. API'leri entegre etmek için hazır altyapı
-AVIATION_EDGE_KEY = os.getenv("AVIATION_EDGE_KEY") 
+app = Flask(__name__, template_folder=".") # index.html aynı dizindeyse
+CORS(app) # Frontend'in sunucuya bağlanabilmesi için izin veriyoruz
 
+AIRLABS_KEY = os.getenv("AIRLABS_API_KEY")
 BBOX = "25.6,35.8,44.8,42.2"
 
 def get_combined_flights():
     combined_data = {}
-
-    # 1. KAYNAK: AirLabs Verisi Çekiliyor
     try:
         airlabs_url = f"https://airlabs.co/api/v9/flights?api_key={AIRLABS_KEY}&_bbox={BBOX}"
         response = requests.get(airlabs_url, timeout=10)
@@ -23,36 +23,34 @@ def get_combined_flights():
                 hex_code = f.get("hex", "").lower()
                 if not hex_code:
                     continue
-                
-                # Standart veri yapımız
                 combined_data[hex_code] = {
                     "hex": hex_code,
-                    "callsign": (f.get("flight_icao") or f.get("flight_iata") or "").upper(),
-                    "aircraft_icao": (f.get("aircraft_icao") or "").upper(),
+                    "flight_icao": f.get("flight_icao"),
+                    "flight_iata": f.get("flight_iata"),
+                    "aircraft_icao": f.get("aircraft_icao"),
                     "alt": f.get("alt", 0),
                     "speed": f.get("speed", 0),
                     "lat": f.get("lat"),
                     "lng": f.get("lng"),
                     "dep_iata": f.get("dep_iata", ""),
-                    "arr_iata": f.get("arr_iata", ""),
-                    "source": "AirLabs"
+                    "arr_iata": f.get("arr_iata", "")
                 }
     except Exception as e:
         print(f"AirLabs hatası: {e}")
-
-    # 2. KAYNAK: Örn. Aviation Edge veya ADS-B Hub (Gelecekte aktif edilecek alan)
-    # Bu alanda ikinci API'den gelen veri döngüye sokulup eğer 'hex_code' 
-    # combined_data içinde zaten varsa, eksik alanları (örn: boş gelen model adını) dolduracak.
-    
-    if AVIATION_EDGE_KEY:
-        try:
-            # Örnek entegrasyon mantığı:
-            # ae_url = f"https://aviation-edge.com/v2/public/flights?key={AVIATION_EDGE_KEY}"
-            # ... veriler çekilir ...
-            # if hex_code in combined_data: 
-            #     if not combined_data[hex_code]["aircraft_icao"]: combined_data[hex_code]["aircraft_icao"] = yeni_model
-            pass
-        except Exception as e:
-            print(f"İkinci API hatası: {e}")
-
     return list(combined_data.values())
+
+# Ana sayfa (Telegram WebApp'in açıldığı yer)
+@app.route('/')
+def index():
+    return render_template('index.html')
+
+# JavaScript'in istek attığı API uç noktası
+@app.route('/api/flights')
+def api_flights():
+    flights = get_combined_flights()
+    return jsonify(flights)
+
+if __name__ == '__main__':
+    # Render veya yerel ortamda portu otomatik ayarlar
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host='0.0.0.0', port=port)
