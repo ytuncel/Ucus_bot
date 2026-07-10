@@ -23,26 +23,21 @@
         const tg = window.Telegram.WebApp;
         tg.expand();
 
-        // Kendi Python API uç noktanız (Artık token ifşa olma derdi bitti)
-        const BACKEND_API_URL = "/api/flights"; 
+     // Sunucu adresini dinamik alır (Örn: https://botunuz.onrender.com/api/flights)
+const BACKEND_API_URL = window.location.origin + "/api/flights"; 
 
-        async function loadFlights(filterType) {
-            // Buton aktiflik sınıfları...
-            const resultsDiv = document.getElementById('results');
-            const loadingDiv = document.getElementById('loading');
-            resultsDiv.innerHTML = '';
-            loadingDiv.style.display = 'block';
+async function loadFlights(filterType) {
+    // ... buton ve loading işlemleri ...
+    try {
+        // Dinamik URL ile istek atılıyor
+        const response = await fetch(BACKEND_API_URL);
+        if (!response.ok) throw new Error("Sunucu hata döndürdü");
+        
+        const flights = await response.json();
+        loadingDiv.style.display = 'none';
+        
+        // ... filtreleme ve kart yazdırma döngüsü ...
 
-            try {
-                // İstek doğrudan kendi Python backend'imize gidiyor
-                const response = await fetch(BACKEND_API_URL);
-                const flights = await response.json();
-                loadingDiv.style.display = 'none';
-
-                if (!flights || flights.length === 0) {
-                    resultsDiv.innerHTML = '<div class="loading">Şu an havada aktif İHA bulunamadı.</div>';
-                    return;
-                }
 
                 // Filtreleme, İlçe analizi ve Kart oluşturma döngüsü Python'dan gelen birleşik veriye göre burada dönecek...
             } catch (error) {
