@@ -1,19 +1,26 @@
 import os
 import requests
 from flask import Flask, jsonify, render_template
-from flask_cors import CORS # Eğer yüklü değilse requirements.txt'ye flask-cors ekleyin
+from flask_cors import CORS  # CORS kütüphanesini dahil ediyoruz
 from dotenv import load_dotenv
 
 load_dotenv()
 
-app = Flask(__name__, template_folder=".") # index.html aynı dizindeyse
-CORS(app) # Frontend'in sunucuya bağlanabilmesi için izin veriyoruz
+# index.html dosyanız main.py ile aynı klasördeyse template_folder="." kalabilir
+app = Flask(__name__, template_folder=".") 
+
+# [KRİTİK GÜNCELLEME]: Tarayıcıların ve Telegram'ın sunucuya bağlanmasına izin veriyoruz
+CORS(app) 
 
 AIRLABS_KEY = os.getenv("AIRLABS_API_KEY")
 BBOX = "25.6,35.8,44.8,42.2"
 
 def get_combined_flights():
     combined_data = {}
+    if not AIRLABS_KEY:
+        print("HATA: AIRLABS_API_KEY bulunamadı! .env veya Render ayarlarını kontrol edin.")
+        return []
+        
     try:
         airlabs_url = f"https://airlabs.co/api/v9/flights?api_key={AIRLABS_KEY}&_bbox={BBOX}"
         response = requests.get(airlabs_url, timeout=10)
@@ -36,21 +43,20 @@ def get_combined_flights():
                     "arr_iata": f.get("arr_iata", "")
                 }
     except Exception as e:
-        print(f"AirLabs hatası: {e}")
+        print(f"AirLabs veri çekme hatası: {e}")
     return list(combined_data.values())
 
-# Ana sayfa (Telegram WebApp'in açıldığı yer)
 @app.route('/')
 def index():
     return render_template('index.html')
 
-# JavaScript'in istek attığı API uç noktası
 @app.route('/api/flights')
 def api_flights():
     flights = get_combined_flights()
     return jsonify(flights)
 
 if __name__ == '__main__':
-    # Render veya yerel ortamda portu otomatik ayarlar
+    # Render canlı ortamda portu otomatik belirler, yerelde 5000 portunu kullanır
     port = int(os.environ.get("PORT", 5000))
-    app.run(host='0.0.0.0', port=port)
+    # [ÇOK ÖNEMLİ]: host='0.0.0.0' Render'ın dış dünyaya açılması için şarttır
+    app.run(host='0.0.0.0', port=port, debug=False)
